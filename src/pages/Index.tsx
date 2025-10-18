@@ -90,12 +90,28 @@ const Index = () => {
 
       if (processError) throw processError;
 
+      setProgress(90);
+      
+      // Get the updated project with generated video path
+      const { data: updatedProject, error: fetchError } = await supabase
+        .from('video_projects')
+        .select('generated_video_path')
+        .eq('id', project.id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Get public URL for the generated video
+      if (updatedProject.generated_video_path) {
+        const { data: urlData } = supabase.storage
+          .from('original-videos')
+          .getPublicUrl(updatedProject.generated_video_path);
+        
+        setGeneratedVideo(urlData.publicUrl);
+      }
+
       setProgress(100);
-      
-      toast.success("Vídeo gerado com sucesso! (Modo MVP)");
-      
-      // In production, you would get the actual generated video URL here
-      setGeneratedVideo(null);
+      toast.success("Vídeo gerado com sucesso!");
 
     } catch (error: any) {
       console.error('Error generating video:', error);
