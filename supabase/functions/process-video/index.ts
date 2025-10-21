@@ -17,10 +17,18 @@ Deno.serve(async (req) => {
       throw new Error('No authorization header');
     }
 
+    // Create two separate clients:
+    // 1. supabase - for database operations with user context
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       { global: { headers: { Authorization: authHeader } } }
+    );
+
+    // 2. supabaseAdmin - for storage operations without user restrictions
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
     const { data: { user } } = await supabase.auth.getUser();
@@ -83,12 +91,6 @@ Deno.serve(async (req) => {
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     // Step 2: Get signed URLs for video and audio
-    // Create admin client without user auth header for storage access
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
     // Remove bucket prefix if present
     const videoPath = project.original_video_path.replace('original-videos/', '');
     // audioPath is now just the filename without bucket prefix
