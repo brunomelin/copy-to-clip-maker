@@ -104,8 +104,8 @@ const Index = () => {
       // Get public URL for the generated video
       if (updatedProject.generated_video_path) {
         const { data: urlData } = supabase.storage
-          .from('original-videos')
-          .getPublicUrl(updatedProject.generated_video_path);
+          .from('generated-videos')
+          .getPublicUrl(updatedProject.generated_video_path.replace('generated-videos/', ''));
         
         setGeneratedVideo(urlData.publicUrl);
       }
