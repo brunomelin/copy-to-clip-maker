@@ -80,8 +80,11 @@ Deno.serve(async (req) => {
     console.log('Audio generated successfully:', audioPath);
 
     // Step 2: Get signed URLs for video and audio
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    // Create admin client without user auth header for storage access
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
 
     // Remove bucket prefix if present
     const videoPath = project.original_video_path.replace('original-videos/', '');
@@ -90,7 +93,7 @@ Deno.serve(async (req) => {
 
     console.log('Creating signed URLs for:', { videoPath, audioFileName });
 
-    const { data: videoSignedUrl, error: videoError } = await supabase.storage
+    const { data: videoSignedUrl, error: videoError } = await supabaseAdmin.storage
       .from('original-videos')
       .createSignedUrl(videoPath, 3600);
 
@@ -99,7 +102,7 @@ Deno.serve(async (req) => {
       throw new Error(`Failed to create video signed URL: ${videoError.message}`);
     }
 
-    const { data: audioSignedUrl, error: audioError } = await supabase.storage
+    const { data: audioSignedUrl, error: audioError } = await supabaseAdmin.storage
       .from('audio-files')
       .createSignedUrl(audioFileName, 3600);
 
@@ -130,8 +133,8 @@ Deno.serve(async (req) => {
         videoUrl: videoSignedUrl.signedUrl,
         audioUrl: audioSignedUrl.signedUrl,
         projectId,
-        supabaseUrl,
-        supabaseKey: serviceRoleKey,
+        supabaseUrl: Deno.env.get('SUPABASE_URL'),
+        supabaseKey: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
       }),
     });
 
