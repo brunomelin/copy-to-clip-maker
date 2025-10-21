@@ -79,6 +79,9 @@ Deno.serve(async (req) => {
 
     console.log('Audio generated successfully:', audioPath);
 
+    // Wait a moment to ensure file is fully available in storage
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
     // Step 2: Get signed URLs for video and audio
     // Create admin client without user auth header for storage access
     const supabaseAdmin = createClient(

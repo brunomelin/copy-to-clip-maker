@@ -79,7 +79,20 @@ Deno.serve(async (req) => {
       throw new Error(`Failed to upload audio: ${uploadError.message}`);
     }
     
-    console.log('Audio uploaded successfully:', fileName);
+    // Verify file exists before returning
+    const { data: fileExists, error: checkError } = await supabase.storage
+      .from('audio-files')
+      .list('', {
+        limit: 1,
+        search: fileName
+      });
+
+    if (checkError || !fileExists || fileExists.length === 0) {
+      console.error('File verification failed:', checkError);
+      throw new Error('Audio uploaded but verification failed');
+    }
+    
+    console.log('Audio uploaded and verified:', fileName);
 
     return new Response(
       JSON.stringify({ 
