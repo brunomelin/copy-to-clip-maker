@@ -128,8 +128,11 @@ Deno.serve(async (req) => {
       throw new Error('VIDEO_PROCESSOR_SERVER_URL not configured');
     }
 
+    // Remove trailing slash if present to avoid double slashes
+    const cleanProcessorUrl = processorUrl.replace(/\/$/, '');
+
     console.log('Step 2: Calling external video processor...');
-    const processorResponse = await fetch(`${processorUrl}/process-video`, {
+    const processorResponse = await fetch(`${cleanProcessorUrl}/process-video`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
