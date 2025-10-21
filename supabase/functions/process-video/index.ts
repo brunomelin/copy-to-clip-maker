@@ -56,32 +56,82 @@ Deno.serve(async (req) => {
       .update({ status: 'processing' })
       .eq('id', projectId);
 
-    // TODO: Implement actual video processing with FFmpeg or similar
-    // For MVP, we'll return a placeholder response
-    // In production, you would:
-    // 1. Download original video from storage
-    // 2. Generate audio using generate-audio function
-    // 3. Create subtitles with timestamps
-    // 4. Merge audio + subtitles + video using FFmpeg
-    // 5. Upload result to storage
-    // 6. Update project with generated video path
+    console.log('Starting video processing pipeline...');
 
-    console.log('Video processing would happen here');
-    console.log('Project details:', { 
-      script: project.script,
-      voice: project.voice_id,
-      language: project.language 
+    // Step 1: Generate audio using ElevenLabs
+    console.log('Step 1: Generating audio with ElevenLabs...');
+    const audioResponse = await supabase.functions.invoke('generate-audio', {
+      body: {
+        text: project.script,
+        voiceId: project.voice_id || '9BWtsMINqrJLrRacOk9x', // Default: Aria
+        language: project.language || 'pt'
+      }
     });
 
-    // Simulate processing time
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    if (audioResponse.error) {
+      throw new Error(`Audio generation failed: ${audioResponse.error.message}`);
+    }
 
-    // For MVP, mark as completed
+    const audioPath = audioResponse.data?.audioPath;
+    if (!audioPath) {
+      throw new Error('Audio generation did not return a valid path');
+    }
+
+    console.log('Audio generated successfully:', audioPath);
+
+    // Step 2: Get signed URLs for video and audio
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+    const { data: videoSignedUrl } = await supabase.storage
+      .from('original-videos')
+      .createSignedUrl(project.original_video_path.replace('original-videos/', ''), 3600);
+
+    const { data: audioSignedUrl } = await supabase.storage
+      .from('audio-files')
+      .createSignedUrl(audioPath.replace('audio-files/', ''), 3600);
+
+    if (!videoSignedUrl?.signedUrl || !audioSignedUrl?.signedUrl) {
+      throw new Error('Failed to generate signed URLs');
+    }
+
+    console.log('Signed URLs generated');
+
+    // Step 3: Call external video processor server
+    const processorUrl = Deno.env.get('VIDEO_PROCESSOR_SERVER_URL');
+    if (!processorUrl) {
+      throw new Error('VIDEO_PROCESSOR_SERVER_URL not configured');
+    }
+
+    console.log('Step 2: Calling external video processor...');
+    const processorResponse = await fetch(`${processorUrl}/process-video`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        videoUrl: videoSignedUrl.signedUrl,
+        audioUrl: audioSignedUrl.signedUrl,
+        projectId,
+        supabaseUrl,
+        supabaseKey: serviceRoleKey,
+      }),
+    });
+
+    if (!processorResponse.ok) {
+      const errorText = await processorResponse.text();
+      throw new Error(`Video processor failed: ${errorText}`);
+    }
+
+    const processorResult = await processorResponse.json();
+    console.log('Video processing completed:', processorResult);
+
+    // Step 4: Update project with generated video path
     await supabase
       .from('video_projects')
       .update({ 
         status: 'completed',
-        generated_video_path: project.original_video_path // Placeholder
+        generated_video_path: processorResult.generatedVideoPath
       })
       .eq('id', projectId);
 
