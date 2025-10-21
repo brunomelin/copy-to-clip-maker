@@ -66,9 +66,8 @@ Deno.serve(async (req) => {
 
     // Upload audio to storage
     const fileName = `${crypto.randomUUID()}.mp3`;
-    const audioPath = `audio-files/${fileName}`;
     
-    const { error: uploadError } = await supabase.storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
       .from('audio-files')
       .upload(fileName, audioBlob, {
         contentType: 'audio/mpeg',
@@ -80,11 +79,11 @@ Deno.serve(async (req) => {
       throw new Error(`Failed to upload audio: ${uploadError.message}`);
     }
     
-    console.log('Audio generated successfully');
+    console.log('Audio uploaded successfully:', fileName);
 
     return new Response(
       JSON.stringify({ 
-        audioPath: audioPath
+        audioPath: fileName
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
@@ -92,7 +91,7 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('Error in generate-audio function:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

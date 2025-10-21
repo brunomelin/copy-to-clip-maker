@@ -85,7 +85,8 @@ Deno.serve(async (req) => {
 
     // Remove bucket prefix if present
     const videoPath = project.original_video_path.replace('original-videos/', '');
-    const audioFileName = audioPath.replace('audio-files/', '');
+    // audioPath is now just the filename without bucket prefix
+    const audioFileName = audioPath;
 
     console.log('Creating signed URLs for:', { videoPath, audioFileName });
 
@@ -163,7 +164,7 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('Error in process-video function:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
