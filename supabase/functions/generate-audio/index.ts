@@ -57,22 +57,34 @@ Deno.serve(async (req) => {
 
     // Get audio as blob
     const audioBlob = await response.blob();
-    const arrayBuffer = await audioBlob.arrayBuffer();
     
-    // Convert to base64
-    const base64Audio = btoa(
-      String.fromCharCode(...new Uint8Array(arrayBuffer))
+    // Initialize Supabase client
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Get timestamps using Whisper via OpenAI for subtitle synchronization
-    // (Optional: This would require OpenAI API key or alternative timestamp generation)
+    // Upload audio to storage
+    const fileName = `${crypto.randomUUID()}.mp3`;
+    const audioPath = `audio-files/${fileName}`;
+    
+    const { error: uploadError } = await supabase.storage
+      .from('audio-files')
+      .upload(fileName, audioBlob, {
+        contentType: 'audio/mpeg',
+        upsert: false
+      });
+
+    if (uploadError) {
+      console.error('Upload error:', uploadError);
+      throw new Error(`Failed to upload audio: ${uploadError.message}`);
+    }
     
     console.log('Audio generated successfully');
 
     return new Response(
       JSON.stringify({ 
-        audioBase64: base64Audio,
-        mimeType: 'audio/mpeg'
+        audioPath: audioPath
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
