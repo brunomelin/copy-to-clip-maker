@@ -83,13 +83,29 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-    const { data: videoSignedUrl } = await supabase.storage
-      .from('original-videos')
-      .createSignedUrl(project.original_video_path.replace('original-videos/', ''), 3600);
+    // Remove bucket prefix if present
+    const videoPath = project.original_video_path.replace('original-videos/', '');
+    const audioFileName = audioPath.replace('audio-files/', '');
 
-    const { data: audioSignedUrl } = await supabase.storage
+    console.log('Creating signed URLs for:', { videoPath, audioFileName });
+
+    const { data: videoSignedUrl, error: videoError } = await supabase.storage
+      .from('original-videos')
+      .createSignedUrl(videoPath, 3600);
+
+    if (videoError) {
+      console.error('Video signed URL error:', videoError);
+      throw new Error(`Failed to create video signed URL: ${videoError.message}`);
+    }
+
+    const { data: audioSignedUrl, error: audioError } = await supabase.storage
       .from('audio-files')
-      .createSignedUrl(audioPath.replace('audio-files/', ''), 3600);
+      .createSignedUrl(audioFileName, 3600);
+
+    if (audioError) {
+      console.error('Audio signed URL error:', audioError);
+      throw new Error(`Failed to create audio signed URL: ${audioError.message}`);
+    }
 
     if (!videoSignedUrl?.signedUrl || !audioSignedUrl?.signedUrl) {
       throw new Error('Failed to generate signed URLs');
