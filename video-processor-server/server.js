@@ -34,7 +34,7 @@ app.post('/process-video', async (req, res) => {
   const tempId = randomUUID();
   const videoPath = join(tmpdir(), `video-${tempId}.mp4`);
   const audioPath = join(tmpdir(), `audio-${tempId}.mp3`);
-  const subtitlePath = join(tmpdir(), `subtitle-${tempId}.srt`);
+  const subtitlePath = join(tmpdir(), `subtitle-${tempId}.ass`);
   const outputPath = join(tmpdir(), `output-${tempId}.mp4`);
 
   try {
@@ -102,50 +102,68 @@ async function downloadFile(url, outputPath) {
   });
 }
 
-// Helper function to generate subtitle file
+// Helper function to generate dynamic word-by-word subtitle file (ASS format)
 function generateSubtitle(text, outputPath) {
-  // Create a simple SRT file with the full text
-  // Split text into chunks of approximately 50 characters for better readability
   const words = text.split(' ');
-  let chunks = [];
-  let currentChunk = '';
+  const secondsPerWord = 0.35; // Duration each word is highlighted
   
-  for (const word of words) {
-    if (currentChunk.length + word.length + 1 <= 50) {
-      currentChunk += (currentChunk ? ' ' : '') + word;
-    } else {
-      if (currentChunk) chunks.push(currentChunk);
-      currentChunk = word;
-    }
-  }
-  if (currentChunk) chunks.push(currentChunk);
+  // ASS header with styling similar to the reference image
+  let assContent = `[Script Info]
+Title: Generated Subtitles
+ScriptType: v4.00+
+WrapStyle: 0
+PlayResX: 1920
+PlayResY: 1080
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial Black,80,&H00FFFFFF,&H000000FF,&H00000000,&HA0008000,-1,0,0,0,100,100,0,0,1,0,0,2,10,10,60,1
+Style: Highlight,Arial Black,80,&H00FFFFFF,&H000000FF,&H00000000,&HFF000000,-1,0,0,0,105,105,0,0,1,4,2,2,10,10,60,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+`;
+
+  let currentTime = 0;
+  const wordsPerLine = 3; // Show 3 words at a time for better visibility
   
-  // Estimate timing: assume 150 words per minute (average speaking rate)
-  const totalWords = words.length;
-  const totalDuration = (totalWords / 150) * 60; // duration in seconds
-  const durationPerChunk = totalDuration / chunks.length;
-  
-  let srtContent = '';
-  chunks.forEach((chunk, index) => {
-    const startTime = index * durationPerChunk;
-    const endTime = (index + 1) * durationPerChunk;
+  for (let i = 0; i < words.length; i += wordsPerLine) {
+    const lineWords = words.slice(i, Math.min(i + wordsPerLine, words.length));
     
-    srtContent += `${index + 1}\n`;
-    srtContent += `${formatSRTTime(startTime)} --> ${formatSRTTime(endTime)}\n`;
-    srtContent += `${chunk}\n\n`;
-  });
+    for (let j = 0; j < lineWords.length; j++) {
+      const start = formatAssTime(currentTime + (j * secondsPerWord));
+      const end = formatAssTime(currentTime + ((j + 1) * secondsPerWord));
+      
+      // Build the line with highlighted current word
+      let text = '';
+      for (let k = 0; k < lineWords.length; k++) {
+        if (k === j) {
+          // Highlight current word with green background effect
+          text += `{\\c&H00FFFF&\\3c&H008000&\\bord6\\shad3\\p0\\1a&H40&}${lineWords[k]}{\\r} `;
+        } else {
+          // Other words with semi-transparent white
+          text += `{\\alpha&H60&}${lineWords[k]}{\\r} `;
+        }
+      }
+      
+      assContent += `Dialogue: 0,${start},${end},Highlight,,0,0,0,,${text.trim()}\n`;
+    }
+    
+    currentTime += lineWords.length * secondsPerWord;
+  }
   
-  writeFileSync(outputPath, srtContent, 'utf8');
+  writeFileSync(outputPath, assContent, 'utf8');
 }
 
-// Helper function to format time for SRT
-function formatSRTTime(seconds) {
+// Helper function to format time in ASS format (H:MM:SS.cc)
+function formatAssTime(seconds) {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const secs = Math.floor(seconds % 60);
-  const ms = Math.floor((seconds % 1) * 1000);
+  const centisecs = Math.floor((seconds % 1) * 100);
   
-  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')},${String(ms).padStart(3, '0')}`;
+  return `${hours}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${String(centisecs).padStart(2, '0')}`;
 }
 
 // Helper function to process video with FFmpeg
@@ -161,7 +179,7 @@ function processWithFFmpeg(videoPath, audioPath, subtitlePath, outputPath) {
         '-map 0:v:0',          // Map video from first input
         '-map 1:a:0',          // Map audio from second input
         '-shortest',           // Finish when shortest input ends
-        `-vf subtitles=${subtitlePath}:force_style='FontSize=24,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=2,Bold=1,Alignment=2'` // Burn in subtitles with styling
+        `-vf subtitles=${subtitlePath}` // Burn in ASS subtitles with advanced styling
       ])
       .output(outputPath)
       .on('start', (commandLine) => {
