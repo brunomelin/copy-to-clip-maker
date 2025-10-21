@@ -107,7 +107,7 @@ function generateSubtitle(text, outputPath) {
   const words = text.split(' ');
   const secondsPerWord = 0.35; // Duration each word is highlighted
   
-  // ASS header with styling similar to the reference image
+  // ASS header with styling matching the reference image
   let assContent = `[Script Info]
 Title: Generated Subtitles
 ScriptType: v4.00+
@@ -118,8 +118,7 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Arial Black,80,&H00FFFFFF,&H000000FF,&H00000000,&HA0008000,-1,0,0,0,100,100,0,0,1,0,0,2,10,10,60,1
-Style: Highlight,Arial Black,80,&H00FFFFFF,&H000000FF,&H00000000,&HFF000000,-1,0,0,0,105,105,0,0,1,4,2,2,10,10,60,1
+Style: Default,Arial Black,85,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,3,4,0,2,10,10,50,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -139,15 +138,15 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       let text = '';
       for (let k = 0; k < lineWords.length; k++) {
         if (k === j) {
-          // Highlight current word with green background effect
-          text += `{\\c&H00FFFF&\\3c&H008000&\\bord6\\shad3\\p0\\1a&H40&}${lineWords[k]}{\\r} `;
+          // Highlight current word with vibrant green background (like in the reference image)
+          text += `{\\bord4\\shad0\\c&H000000&\\3c&H00FF00&\\4c&H00FF00&}${lineWords[k]}{\\r} `;
         } else {
-          // Other words with semi-transparent white
-          text += `{\\alpha&H60&}${lineWords[k]}{\\r} `;
+          // Other words: white text with black outline
+          text += `{\\bord4\\shad0\\c&HFFFFFF&\\3c&H000000&}${lineWords[k]}{\\r} `;
         }
       }
       
-      assContent += `Dialogue: 0,${start},${end},Highlight,,0,0,0,,${text.trim()}\n`;
+      assContent += `Dialogue: 0,${start},${end},Default,,0,0,0,,${text.trim()}\n`;
     }
     
     currentTime += lineWords.length * secondsPerWord;
