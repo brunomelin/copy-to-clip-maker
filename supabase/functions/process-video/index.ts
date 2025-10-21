@@ -141,6 +141,7 @@ Deno.serve(async (req) => {
         videoUrl: videoSignedUrl.signedUrl,
         audioUrl: audioSignedUrl.signedUrl,
         projectId,
+        script: project.script,
         supabaseUrl: Deno.env.get('SUPABASE_URL'),
         supabaseKey: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
       }),
