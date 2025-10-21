@@ -48,9 +48,14 @@ app.post('/process-video', async (req, res) => {
     console.log(`[${projectId}] Downloading audio from: ${audioUrl}`);
     await downloadFile(audioUrl, audioPath);
 
-    // Generate subtitle file
+    // Get audio duration for accurate subtitle timing
+    console.log(`[${projectId}] Getting audio duration...`);
+    const audioDuration = await getAudioDuration(audioPath);
+    console.log(`[${projectId}] Audio duration: ${audioDuration.toFixed(2)}s`);
+
+    // Generate subtitle file with accurate timing
     console.log(`[${projectId}] Generating subtitle file...`);
-    generateSubtitle(script, subtitlePath);
+    generateSubtitle(script, subtitlePath, audioDuration);
 
     // Process video with FFmpeg
     console.log(`[${projectId}] Processing with FFmpeg...`);
@@ -102,10 +107,27 @@ async function downloadFile(url, outputPath) {
   });
 }
 
+// Helper function to get audio duration using ffprobe
+function getAudioDuration(audioPath) {
+  return new Promise((resolve, reject) => {
+    ffmpeg.ffprobe(audioPath, (err, metadata) => {
+      if (err) {
+        reject(err);
+      } else {
+        const duration = metadata.format.duration;
+        resolve(duration);
+      }
+    });
+  });
+}
+
 // Helper function to generate dynamic word-by-word subtitle file (ASS format)
-function generateSubtitle(text, outputPath) {
+function generateSubtitle(text, outputPath, audioDuration) {
   const words = text.split(' ');
-  const secondsPerWord = 0.35; // Duration each word is highlighted
+  const totalWords = words.length;
+  
+  // Calculate actual time per word based on audio duration
+  const secondsPerWord = audioDuration / totalWords;
   
   // ASS header with styling matching the reference image
   let assContent = `[Script Info]
@@ -131,6 +153,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     const lineWords = words.slice(i, Math.min(i + wordsPerLine, words.length));
     
     for (let j = 0; j < lineWords.length; j++) {
+      const wordIndex = i + j;
+      if (wordIndex >= words.length) break;
+      
       const start = formatAssTime(currentTime + (j * secondsPerWord));
       const end = formatAssTime(currentTime + ((j + 1) * secondsPerWord));
       
@@ -153,6 +178,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
   }
   
   writeFileSync(outputPath, assContent, 'utf8');
+  console.log(`Subtitle file generated with ${totalWords} words over ${audioDuration.toFixed(2)}s (${secondsPerWord.toFixed(3)}s per word)`);
 }
 
 // Helper function to format time in ASS format (H:MM:SS.cc)
